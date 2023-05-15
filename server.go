@@ -15,6 +15,7 @@ type Server struct {
 	config        Config        // 服务器配置
 	logger        Logger        // 日志记录器
 	monitor       Monitor       // 流量监控器
+	listener      net.Listener  // 监听
 	authenticator Authenticator // 认证接口
 }
 
@@ -60,4 +61,9 @@ func (s *Server) ListenAndServe() error {
 			c.Handle()
 		}()
 	}
+}
+
+// 关闭
+func (s *Server) Close() {
+	s.listener.Close()
 }
