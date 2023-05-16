@@ -1,6 +1,8 @@
 package socket5
 
 import (
+	"errors"
+	"io"
 	"net"
 )
 
@@ -23,34 +25,65 @@ func (a *NoAuth) Authenticate(conn net.Conn) error {
 	return nil
 }
 
-// // PasswordAuth 实现了基于用户名和密码的认证接口。
-// type PasswordAuth struct {
-// 	Username string // 用户名
-// 	Password string // 密码
-// }
+type User struct {
+}
 
-// // Authenticate 方法实现了基于用户名和密码的认证逻辑。
-// func (a *PasswordAuth) Authenticate(conn net.Conn) error {
-// 	// 发送认证方法响应消息，表示支持账号密码认证
-// 	if err := sendAuthenticationMethodResponse(conn, AuthenticationMethodUsernamePassword); err != nil {
-// 		return err
-// 	}
+func (u *User) authenticate(username []byte, password []byte) error {
+	return nil
+}
 
-// 	// 接收客户端发送过来的账号密码认证信息
-// 	username, password, err := receiveUsernamePasswordAuthRequest(conn)
-// 	if err != nil {
-// 		return err
-// 	}
+// PasswordAuth 实现了基于用户名和密码的认证接口。
+type PasswordAuth struct {
+	Username string
+	Password string
+	// 账号密码认证
+	User *User
+}
 
-// 	// 校验用户名和密码是否正确
-// 	if username != a.Username || password != a.Password {
-// 		return errors.New("invalid username or password")
-// 	}
+// GetCode
+func (a *PasswordAuth) GetCode() uint8 {
+	return uint8(2)
+}
 
-// 	// 发送认证成功的响应消息
-// 	if err := sendUsernamePasswordAuthResponse(conn); err != nil {
-// 		return err
-// 	}
+// Authenticate 方法实现了基于用户名和密码的认证逻辑。
+func (a *PasswordAuth) Authenticate(conn net.Conn) error {
+	// 验证版本 （不是socket5版本是认证协议的版本）
+	ver := make([]byte, 1)
+	io.ReadFull(conn, ver)
+	if ver[0] != 1 {
+		return errors.New("error Version")
+	}
 
-// 	return nil
-// }
+	// 读取账号长度
+	userLen := make([]byte, 1)
+	io.ReadFull(conn, userLen)
+
+	// 读取账户
+	user := make([]byte, int(userLen[0]))
+	io.ReadFull(conn, user)
+
+	// 读取密码长度
+	passLen := make([]byte, 1)
+	io.ReadFull(conn, passLen)
+
+	// 读取密码
+	pass := make([]byte, int(passLen[0]))
+	io.ReadFull(conn, pass)
+
+	// 校验用户名和密码是否正确
+	if a.User == nil {
+		if string(user) != a.Username || string(pass) != a.Password {
+			return errors.New("invalid username or password")
+		}
+	} else {
+		if err := a.User.authenticate(user, pass); err != nil {
+			return err
+		}
+
+	}
+
+	// 发送认证成功的响应消息
+	conn.Write([]byte{socks5Version, 0x00})
+
+	return nil
+}
